@@ -1,0 +1,27 @@
+name: Refresh thumbnail video terbaru
+on:
+  push:
+    paths: ["mancing/latest.json", ".github/workflows/thumb.yml"]
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  thumb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download cover from TikTok oEmbed
+        run: |
+          URL=$(jq -r .url mancing/latest.json)
+          T=$(curl -fsSL -A "Mozilla/5.0" "https://www.tiktok.com/oembed?url=${URL}" | jq -r .thumbnail_url)
+          echo "thumb: $T"
+          curl -fsSL -A "Mozilla/5.0" "$T" -o /tmp/t.jpg
+          python3 -c "from PIL import Image; im=Image.open('/tmp/t.jpg').convert('RGB'); w=240; im.resize((w,int(im.height*w/im.width))).save('mancing/thumb.jpg','JPEG',quality=80)"
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mancing/thumb.jpg
+          git diff --cached --quiet || (git commit -m "Update thumbnail video terbaru" && git push)
