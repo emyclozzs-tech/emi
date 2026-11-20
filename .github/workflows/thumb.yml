@@ -19,6 +19,21 @@ jobs:
           echo "oembed: ${R:0:600}"
           T=$(jq -r '.cover // empty' mancing/latest.json)
           [ -z "$T" ] && T=$(echo "$R" | jq -r '.thumbnail_url // empty')
+          if [ -z "$T" ]; then
+            curl -sSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36" "$FULL" -o /tmp/page.html || true
+            echo "page bytes: $(wc -c < /tmp/page.html)"
+            python3 - <<'PY' > /tmp/meta.txt
+          import re,html,json
+          s=open('/tmp/page.html',encoding='utf-8',errors='ignore').read()
+          def m(p):
+              r=re.search(p,s); return html.unescape(r.group(1)) if r else ''
+          img=m(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"') or json.loads('"'+m(r'"(?:originCover|cover)":"(https:[^"]+)"')+'"') if (m(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"') or m(r'"(?:originCover|cover)":"(https:[^"]+)"')) else ''
+          desc=m(r'<meta[^>]+property="og:description"[^>]+content="([^"]*)"') or m(r'"desc":"([^"]*)"')
+          print(img); print(desc)
+          PY
+            cat /tmp/meta.txt | head -c 600; echo
+            T=$(sed -n 1p /tmp/meta.txt)
+          fi
           curl -fsSL -A "Mozilla/5.0" "$T" -o /tmp/t.img
           pip install -q pillow
           python3 -c "from PIL import Image; im=Image.open('/tmp/t.img').convert('RGB'); w=240; im.resize((w,int(im.height*w/im.width))).save('mancing/thumb.jpg','JPEG',quality=80)"
