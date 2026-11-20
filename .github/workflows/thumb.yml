@@ -12,14 +12,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download cover from TikTok oEmbed
         run: |
+          URL=$(jq -r .url mancing/latest.json)
+          FULL=$(curl -sSL -A "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" -o /dev/null -w '%{url_effective}' "$URL" || true)
+          echo "resolved: $FULL"
+          R=$(curl -sSL -A "Mozilla/5.0" "https://www.tiktok.com/oembed?url=${URL}" || true)
+          echo "oembed: ${R:0:600}"
           T=$(jq -r '.cover // empty' mancing/latest.json)
-          if [ -z "$T" ] || ! curl -fsSL -A "Mozilla/5.0" "$T" -o /tmp/t.img; then
-            URL=$(jq -r .url mancing/latest.json)
-            R=$(curl -sSL -A "Mozilla/5.0" "https://www.tiktok.com/oembed?url=${URL}")
-            echo "oembed: ${R:0:300}"
-            T=$(echo "$R" | jq -r .thumbnail_url)
-            curl -fsSL -A "Mozilla/5.0" "$T" -o /tmp/t.img
-          fi
+          [ -z "$T" ] && T=$(echo "$R" | jq -r '.thumbnail_url // empty')
+          curl -fsSL -A "Mozilla/5.0" "$T" -o /tmp/t.img
           pip install -q pillow
           python3 -c "from PIL import Image; im=Image.open('/tmp/t.img').convert('RGB'); w=240; im.resize((w,int(im.height*w/im.width))).save('mancing/thumb.jpg','JPEG',quality=80)"
       - name: Commit if changed
